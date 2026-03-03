@@ -1,22 +1,86 @@
 <!DOCTYPE html>
 <html>
-<script>
-const xmlhttp = new XMLHttpRequest();
-
-xmlhttp.onload = function() {
-  const myObj = JSON.parse(this.responseText);
-  document.getElementById("demo").innerHTML = myObj.valore;
-}
-//formato oggetti javascript
-const formData={nome:"prova", valore:3};
-xmlhttp.open("POST", "index.php");
-xmlhttp.setRequestHeader("Content-type","application/json");
-var dati = JSON.stringify(formData);
-//console.log(JSON.stringify(formData));
-xmlhttp.send(dati);
-</script>
+<head>
+    <title>CRUD JSON/XML</title>
+</head>
 <body>
-<h2>Richiesta POST con JSON</h2>
-<p id="demo"></p>
+
+<h2>CRUD Utenti</h2>
+
+<input type="text" id="nome" placeholder="Nome">
+<input type="number" id="id" placeholder="ID (per update/delete)">
+
+<br><br>
+
+<button onclick="create()">CREATE</button>
+<button onclick="read()">READ</button>
+<button onclick="update()">UPDATE</button>
+<button onclick="remove()">DELETE</button>
+
+<pre id="output"></pre>
+
+<script>
+
+const url = "index.php";
+
+function create() {
+    fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        body: JSON.stringify({
+            nome: document.getElementById("nome").value
+        })
+    })
+    .then(res => res.text())
+    .then(data => document.getElementById("output").innerText = data);
+}
+
+function read() {
+    fetch(url, {
+        method: "GET",
+        headers: {
+            "Accept": "application/json"
+        }
+    })
+    .then(res => res.text())
+    .then(data => document.getElementById("output").innerText = data);
+}
+
+function update() {
+    fetch(url, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        body: JSON.stringify({
+            id: document.getElementById("id").value,
+            nome: document.getElementById("nome").value
+        })
+    })
+    .then(res => res.text())
+    .then(data => document.getElementById("output").innerText = data);
+}
+
+function remove() {
+    fetch(url, {
+        method: "DELETE",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        body: JSON.stringify({
+            id: document.getElementById("id").value
+        })
+    })
+    .then(res => res.text())
+    .then(data => document.getElementById("output").innerText = data);
+}
+
+</script>
+
 </body>
 </html>

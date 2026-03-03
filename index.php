@@ -1,78 +1,93 @@
 <?php
-header("Access-Control-Allow-Origin:");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: OPTIONS,GET,POST,PUT,DELETE");
-header("Access-Control-Max-Age: 3600");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-foreach($_SERVER as $chiave=>$valore){
-    echo $chiave."-->".$valore."\n<br>";
+$file = "data.json";
+
+// Se non esiste lo creo
+if (!file_exists($file)) {
+    file_put_contents($file, json_encode([]));
 }
-*/
 
-//elabora header
-$metodo=$_SERVER["REQUEST_METHOD"];
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = explode( '/', $uri );
+$data = json_decode(file_get_contents($file), true);
+$method = $_SERVER['REQUEST_METHOD'];
 
-//legge il tipo di contenuto inviato dal client
-$ct=$_SERVER["CONTENT_TYPE"];
-$type=explode("/",$ct);
+$contentType = $_SERVER["CONTENT_TYPE"] ?? "";
+$accept = $_SERVER["HTTP_ACCEPT"] ?? "application/json";
 
-//legge il tipo di contenuto di ritorno richiesto dal client
-$retct=$_SERVER["HTTP_ACCEPT"];
-$ret=explode("/",$retct);
-echo $type[1];
-//print_r($uri);
-//echo "metodo-->".$metodo;
+$inputRaw = file_get_contents("php://input");
 
-if ($metodo=="GET"){
-    echo "get";       
-}
-if ($metodo=="POST"){
-    echo "post\n";
-    //recupera i dati dall'header
-   $body=file_get_contents('php://input');
-   // echo $body
-   
-   //converte in array associativo
-    if ($type[1]=="json"){
-        $data = json_decode($body,true);
+// === Funzione per convertire in XML ===
+function toXML($array) {
+    $xml = new SimpleXMLElement('<root/>');
+    foreach ($array as $item) {
+        $user = $xml->addChild('user');
+        foreach ($item as $key => $value) {
+            $user->addChild($key, $value);
+        }
     }
-    if ($type[1]=="xml"){
-        $xml = simplexml_load_string($body);
-        $json = json_encode($xml);
-        $data = json_decode($json, true);
-    }
-    
-    //elabora i dati o interagisce con il database
-    $data["valore"]+=2000;
-    
-    //settaggio dei campi dell'header
-    header("Content-Type: ".$retct);    
-    //restituisce i dati convertiti nel formato richiesto
-    if ($ret[1]=="json"){
-        echo json_encode($data);
-    }
-    if ($ret[1]=="xml"){
-        $xml = new SimpleXMLElement('<root/>');
-        array_walk_recursive($data, array ($xml, 'addChild'));    
-        echo $xml->asXML();
-        //alternativa
-        $r='<?xml version="1.0"?><rec><nome>'.$data["nome"].'</nome><valore>'.$data["valore"].'</valore></rec>';
-    }
-   
-}
-if ($metodo=="PUT"){
-    echo "put";
-    //codice di risposta
-    http_response_code(404);
-}
-if ($metodo=="DELETE"){
-    echo "delete";
-    http_response_code(404);
+    return $xml->asXML();
 }
 
+// === Funzione risposta ===
+function sendResponse($data, $accept) {
+    if ($accept == "application/xml") {
+        header("Content-Type: application/xml");
+        echo toXML($data);
+    } else {
+        header("Content-Type: application/json");
+        echo json_encode($data, JSON_PRETTY_PRINT);
+    }
+    exit;
+}
 
+// === Parsing input ===
+if ($contentType == "application/xml") {
+    $xml = simplexml_load_string($inputRaw);
+    $input = json_decode(json_encode($xml), true);
+} else {
+    $input = json_decode($inputRaw, true);
+}
+
+// ===== CREATE =====
+if ($method == "POST") {
+
+    $new = [
+        "id" => time(),
+        "nome" => $input["nome"]
+    ];
+
+    $data[] = $new;
+    file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT));
+
+    sendResponse($new, $accept);
+}
+
+// ===== READ =====
+elseif ($method == "GET") {
+    sendResponse($data, $accept);
+}
+
+// ===== UPDATE =====
+elseif ($method == "PUT") {
+
+    foreach ($data as &$item) {
+        if ($item["id"] == $input["id"]) {
+            $item["nome"] = $input["nome"];
+        }
+    }
+
+    file_put_contents($file, json_encode($data, JSON_PRETTY_PRINT));
+    sendResponse(["message" => "Aggiornato"], $accept);
+}
+
+// ===== DELETE =====
+elseif ($method == "DELETE") {
+
+    $data = array_filter($data, function($item) use ($input) {
+        return $item["id"] != $input["id"];
+    });
+
+    file_put_contents($file, json_encode(array_values($data), JSON_PRETTY_PRINT));
+    sendResponse(["message" => "Eliminato"], $accept);
+}
 
 ?>
